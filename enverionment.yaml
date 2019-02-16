@@ -1,0 +1,9 @@
+name: loan-simu
+dependencies:
+- python=3.6
+- pip:
+    - pandas
+    - numpy
+    - pytest
+    - jupyter
+    - ipython
