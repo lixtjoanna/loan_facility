@@ -68,41 +68,48 @@ class FacilityAssignment(object):
         if not df_cur.empty:
             facility = df_cur.sort_values(by=['interest_rate']).iloc[0]
             facility_id, facility_interest_rate = facility['facility_id'], facility['interest_rate']
-            expected_yield = int((1 - default_likelihood) * loan_interest_rate * amount - \
+            expected_yield = int(round((1 - default_likelihood) * loan_interest_rate * amount - \
                              default_likelihood * amount - \
-                             facility_interest_rate * amount)
+                             facility_interest_rate * amount))
             logging.info('Facililty %s will add new expected_yield %s' % (facility_id, expected_yield))
-            self.__write_to_file(int(facility_id), str(id), int(expected_yield))
-            self.__reduce_amount_from_facility(facility_id, int(amount))
+            new_expect = self.__write_to_file(int(facility_id), str(id), int(expected_yield))
+            new_capacity = self.__reduce_amount_from_facility(facility_id, int(amount))
+            return str(facility_id), str(new_expect), str(new_capacity)
         else:
             logging.warning('No facility found for loan number %s' % id)
+            return None
+
 
     def __write_to_file(self, facility_id, loan_id, expected_yield):
         with open(ASSIGNMENT_FILE_PATH, 'a') as assignment_data:
             assignment_data.write('%s,%s\n' % (loan_id, facility_id))
 
         yield_df = pd.read_csv(YIELD_FILE_PATH)
-
+        new_expect = expected_yield
         if not yield_df[yield_df.facility_id == facility_id].empty:
-            logging.info('Facility number %s found in record, will update the expected yield value' % facility_id)
-            yield_df.loc[yield_df.facility_id == facility_id, 'expected_yield'] += expected_yield
+            logging.info('Facility number %s found in yield.csv, will update the expected yield value' % facility_id)
+            old_val = yield_df.loc[yield_df.facility_id == facility_id]['expected_yield']
+            new_expect = expected_yield + old_val
+            yield_df.loc[yield_df.facility_id == facility_id, 'expected_yield'] = new_expect
         else:
-            logging.info('Facility number %s not found in record, will create row' % facility_id)
-            yield_df = yield_df.append(pd.DataFrame([[facility_id, expected_yield]],
+            logging.info('Facility number %s not found in yield.csv, will create row' % facility_id)
+            yield_df = yield_df.append(pd.DataFrame([[facility_id, new_expect]],
                                                     columns=['facility_id', 'expected_yield']))
 
         yield_df.to_csv(YIELD_FILE_PATH, index=None)
+        return new_expect
 
     def __reduce_amount_from_facility(self, facility_id,  value):
 
-        old_val = self.bank_and_facility_df.loc[self.bank_and_facility_df.facility_id == facility_id]['amount']
+        old_val = self.bank_and_facility_df.loc[self.bank_and_facility_df.facility_id == facility_id]['amount'].item()
         logging.info('Facility %s amount before is %s' % (facility_id, old_val))
         self.bank_and_facility_df.loc[self.bank_and_facility_df.facility_id == facility_id, 'amount'] = old_val - value
         logging.info('Facility %s amount is updated to %s' %(facility_id, old_val - value))
+        return old_val - value
 
 
 if __name__ == '__main__':
-    with open(os.path.join(file_source , 'loans.csv'), 'r') as loan_data:
+    with open(os.path.join(file_source, 'loans.csv'), 'r') as loan_data:
         loan_stream = loan_data.read().split('\n')
     assignment = FacilityAssignment()
     for line in loan_stream[1:-1]:
