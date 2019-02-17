@@ -2,6 +2,7 @@ import pandas as pd
 import os
 import logging
 
+logging.basicConfig(level=logging.INFO)
 DEV_PLAN = True if 'DEV_PLAN' in os.environ else False
 file_source = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'small' if DEV_PLAN else 'large')
 YIELD_FILE_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'output/yields.csv')
@@ -19,7 +20,7 @@ class FacilityAssignment(object):
         output_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'output')
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
-
+        logging.info('Reading files from %s' % file_source)
         with open(YIELD_FILE_PATH, 'w') as yield_data:
             yield_data.write('facility_id,expected_yield\n')
         logging.info('Created output yield csv file %s' % YIELD_FILE_PATH)
@@ -98,3 +99,12 @@ class FacilityAssignment(object):
         logging.info('Facility %s amount before is %s' % (facility_id, old_val))
         self.bank_and_facility_df.loc[self.bank_and_facility_df.facility_id == facility_id, 'amount'] = old_val - value
         logging.info('Facility %s amount is updated to %s' %(facility_id, old_val - value))
+
+
+if __name__ == '__main__':
+    with open(os.path.join(file_source , 'loans.csv'), 'r') as loan_data:
+        loan_stream = loan_data.read().split('\n')
+    assignment = FacilityAssignment()
+    for line in loan_stream[1:-1]:
+        interest_rate, amount, id, default_likelihood, state = line.split(',')
+        assignment.simulation(float(interest_rate), int(amount), id, float(default_likelihood), state)
