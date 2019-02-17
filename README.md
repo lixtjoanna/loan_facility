@@ -5,6 +5,9 @@
 2. run `conda env create -f environment.yaml`
 3. `source activate loan-simu`
 
+### To replay the output files
+`PYTHONPATH=.:src/:test/ python src/simulation.py`
+
 ### Run testcases
 
 `DEV_PLAN=1 PYTHONPATH=.:src/:test/ pytest test -vv -x`
