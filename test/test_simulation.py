@@ -15,17 +15,9 @@ def loan_csv():
 
 def test_simualtion(loan_csv):
     assignment = FacilityAssignment()
-    for line in loan_csv[1:]:
-
+    for line in loan_csv[1:-1]:
         interest_rate, amount, id, default_likelihood, state = line.split(',')
-
         assignment.simulation(float(interest_rate), int(amount), id, float(default_likelihood), state)
-
-        print('YIELD_FILE_PATH', open(YIELD_FILE_PATH, 'r').readlines())
-        print('ASSIGNMENT_FILE_PATH', open(ASSIGNMENT_FILE_PATH, 'r').readlines())
-
-    # os.remove(YIELD_FILE_PATH)
-    # os.remove(ASSIGNMENT_FILE_PATH)
     assert False
 
 

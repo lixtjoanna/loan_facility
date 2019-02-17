@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import logging
+
 DEV_PLAN = True if 'DEV_PLAN' in os.environ else False
 file_source = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'small' if DEV_PLAN else 'large')
 YIELD_FILE_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'output/yield.csv')
@@ -21,8 +22,10 @@ class FacilityAssignment(object):
 
         with open(YIELD_FILE_PATH, 'w') as yield_data:
             yield_data.write('facility_id,expected_yield\n')
+        logging.info('Created output yield csv file %s' % YIELD_FILE_PATH)
         with open(ASSIGNMENT_FILE_PATH, 'w') as assignment_data:
             assignment_data.write('loan_id,facility_id\n')
+        logging.info('Created output assignment csv file %s' % ASSIGNMENT_FILE_PATH)
 
     def pre_process(self):
         """join bank, facility and covenat table"""
@@ -35,9 +38,10 @@ class FacilityAssignment(object):
             'max_default_likelihood': 'sum',
             'banned_state': lambda x: tuple(x)
         })
-
+        logging.debug('Convert covenants data frame to shape {}'.format(covenants_df.shape))
         # inner join facility table and covenant table with facility id
         self.bank_and_facility_df = facilities_df.join(covenants_df, on=['id'])
+        logging.debug('Merged covenants to facility table with shape {}'.format(self.bank_and_facility_df.shape))
 
         # join the data frame with bank name
         # also rename some columns for better human understanding
@@ -45,6 +49,7 @@ class FacilityAssignment(object):
             .join(banks_df.set_index(['id']), on=['bank_id']) \
             .rename(columns={'name': 'bank_name', 'id': 'facility_id'})
         self.bank_and_facility_df['banned_state'] = self.bank_and_facility_df.banned_state
+        logging.info('Create dataframe bank_and_facility_df with shape {}'.format(self.bank_and_facility_df.shape))
         return self.bank_and_facility_df
 
     def simulation(self, loan_interest_rate, amount, id, default_likelihood, state):
@@ -56,7 +61,7 @@ class FacilityAssignment(object):
             Affirm will make money from the difference of interest
         """
         df_cur = self.bank_and_facility_df[(self.bank_and_facility_df.amount >= amount) &
-                                           (self.bank_and_facility_df.max_default_likelihood > default_likelihood) &
+                                           (self.bank_and_facility_df.max_default_likelihood >= default_likelihood) &
                                            (self.bank_and_facility_df.interest_rate < loan_interest_rate) &
                                            (self.bank_and_facility_df.banned_state.apply(lambda y: state not in y))]
         if not df_cur.empty:
@@ -65,17 +70,31 @@ class FacilityAssignment(object):
             expected_yield = int((1 - default_likelihood) * loan_interest_rate * amount - \
                              default_likelihood * amount - \
                              facility_interest_rate * amount)
-
-            self.__write_to_file(str(facility_id), str(id), str(expected_yield))
+            logging.debug('Facililty %s will add new expected_yield %s' % (facility_id, expected_yield))
+            self.__write_to_file(int(facility_id), str(id), int(expected_yield))
             self.__reduce_amount_from_facility(facility_id, int(amount))
         else:
-            logging.warning('No facility found')
+            logging.warning('No facility found for loan number %s' % id)
 
     def __write_to_file(self, facility_id, loan_id, expected_yield):
-        with open(YIELD_FILE_PATH, 'a') as yield_data:
-            yield_data.write(facility_id + ',' + expected_yield + '\n')
         with open(ASSIGNMENT_FILE_PATH, 'a') as assignment_data:
-            assignment_data.write(loan_id + ',' + facility_id + '\n')
+            assignment_data.write('%s,%s\n' % (loan_id, facility_id))
+
+        yield_df = pd.read_csv(YIELD_FILE_PATH)
+
+        if not yield_df[yield_df.facility_id == facility_id].empty:
+            logging.debug('Facility number %s found in record, will update the expected yield value' % facility_id)
+            yield_df.loc[yield_df.facility_id == facility_id, 'expected_yield'] += expected_yield
+        else:
+            logging.debug('Facility number %s not found in record, will create row' % facility_id)
+            yield_df = yield_df.append(pd.DataFrame([[facility_id, expected_yield]],
+                                                    columns=['facility_id', 'expected_yield']))
+
+        yield_df.to_csv(YIELD_FILE_PATH, index=None)
 
     def __reduce_amount_from_facility(self, facility_id,  value):
-        self.bank_and_facility_df[self.bank_and_facility_df.facility_id == facility_id]['amount'] = self.bank_and_facility_df[self.bank_and_facility_df.facility_id == facility_id]['amount'] - value
+
+        old_val = self.bank_and_facility_df.loc[self.bank_and_facility_df.facility_id == facility_id]['amount']
+        logging.debug('Facility %s amount before is %s' % (facility_id, old_val))
+        self.bank_and_facility_df.loc[self.bank_and_facility_df.facility_id == facility_id, 'amount'] = old_val - value
+        logging.debug('Facility %s amount is updated to %s' %(facility_id, old_val - value))
