@@ -5,6 +5,4 @@ dependencies:
     - pandas
     - numpy
     - pytest
-    - jupyter
-    - ipython
     - flask
