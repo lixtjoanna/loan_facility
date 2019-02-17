@@ -7,9 +7,9 @@ simulation = FacilityAssignment()
 app = Flask(__name__)
 
 
-@app.route("/newloan", methods=['GET'])
+@app.route("/newloan", methods=['POST'])
 def new_loan():
-    if request.method == 'POST':
+    if request.method == 'GET':
         response = app.response_class(
             response=json.dumps({
                 'status':'FAILED',
