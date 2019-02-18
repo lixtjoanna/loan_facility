@@ -45,6 +45,7 @@ As well as a lot of details includes
   - ..
   
 each of these all needs to be very carefully processed.
+
 **2. How would you modify your data model or code to account for an eventual introduction of new, as-of-yet unknown types of covenants, beyond just maximum default likelihood and state restrictions?**
     
 To add a new covenant, I think it might be a good idea to use python's functional programing,
