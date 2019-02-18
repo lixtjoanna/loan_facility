@@ -79,7 +79,6 @@ class FacilityAssignment(object):
             logging.warning('No facility found for loan number %s' % id)
             return None
 
-
     def __write_to_file(self, facility_id, loan_id, expected_yield):
         with open(ASSIGNMENT_FILE_PATH, 'a') as assignment_data:
             assignment_data.write('%s,%s\n' % (loan_id, facility_id))
